@@ -1,4 +1,4 @@
-testing              ! prefix of model file names, suffixes: vp_ vs_ rho_
+testing              ! prefix of model file names, suffixes: _vp _vs _rho
 acqui_src            ! sources positions ascii file name
 acqui_rcv            ! receiver positions ascoo file name
 1996                 ! zmax
