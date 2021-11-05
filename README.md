@@ -1,4 +1,4 @@
-<h2>FD Solver for the Elastic Wave Equation in 2D using Staggered Grids Scheme, as per Virieux 1986<h2/>
+<h2>FD Solver for the Elastic Wave Equation in 2D using Staggered Grids Scheme, as per Virieux 1986</h2>
 
 
 
