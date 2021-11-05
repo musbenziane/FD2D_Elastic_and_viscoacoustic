@@ -2,7 +2,7 @@
 subroutine ricker(nt,f0,dt,source)
     implicit none
     integer                      :: nt, it
-    real (kind=8)                :: f0, pt, a_ricker, dt, t0,a,t
+    real (kind=8)                :: f0, pt, a_ricker, dt, t0,t
     real (kind=8),dimension(nt)  :: source, temp
 
     source = 0
