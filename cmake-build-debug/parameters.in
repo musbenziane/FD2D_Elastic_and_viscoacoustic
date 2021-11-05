@@ -1,18 +1,18 @@
 testing              ! prefix of model file names, suffixes: vp_ vs_ rho_
-3200                 ! zmax
-1600                 ! xmax
+acqui_src            ! sources positions ascii file name
+acqui_rcv            ! receiver positions ascoo file name
+1996                 ! zmax
+1996                 ! xmax
 500                  ! nz
 500                  ! nx
-.4                   ! dz
-.4                   ! dx
-0.000038             ! dt
+4                    ! dz
+4                    ! dx
+0.0005               ! dt
 3000                 ! nt
-3.                   ! Wavelet's peak frequency
-10                   ! Source location [x]
-10                   ! Source location [z]
+10.                  ! Wavelet's peak frequency
 50                   ! Snapshot interval
 1                    ! [0/1] explosive, otherwise vertical
 1                    ! [0/1] Free Surface
 1                    ! [0/1] Absorbing
 .6                   ! Att constant for sponge layer
-5                    ! Sponge layer width
+30                   ! Sponge layer width
