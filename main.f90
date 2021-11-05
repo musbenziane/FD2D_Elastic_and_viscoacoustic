@@ -3,12 +3,12 @@ program FD2D_ELASTIC
     use read_acqui
 
     implicit none
-    real(kind=8)                                    :: dz, dx, dt, f0, xmax, zmax, lambdamin, gppw, tmpz, tmpx
+    real(kind=8)                                    :: dz, dx, dt, f0, xmax, zmax, lambdamin, gppw, tol
     real(kind=8)                                    :: CFL, d(2), attConst, taper, time, t_cpu_0, t_cpu_1, t_cpu
     real(kind=8), dimension(:),     allocatable     :: src, gz, gx, zrcv, xrcv, zsrc, xsrc
     real(kind=8), dimension(:,:),   allocatable     :: vp2D, vs2D, rho2D, B, M, L, sigma, tau, xi, u, v, gzx, SGX, SGZ
     real(kind=8), dimension(:,:,:), allocatable     :: Usnap, Vsnap
-    integer                                         :: nz,nx, isnap, nt, tol, it, iz, ix, is, k, srctype,i
+    integer                                         :: nz,nx, isnap, nt, it, iz, ix, is, k, srctype,i
     integer                                         :: gWidth, FS, ABS, reclsnaps, n_workers, ir, t0, t1, nshot, nrcv
     integer, dimension(:), allocatable              :: isrc, jsrc, ircv, jrcv
     character(len=40)                               :: filename, outname_u, outname_v, filecheck, modnameprefix
@@ -111,19 +111,18 @@ program FD2D_ELASTIC
     !###############################################
     !### Acquisition geometry and indices stuff ####
     !### Source indices
-    isrc = NINT(zsrc / dz )
-    jsrc = NINT(xsrc / dx )
+    isrc = NINT(zsrc / dz )+1
+    jsrc = NINT(xsrc / dx )+1
     !### receiver indices
     ircv = NINT(zrcv / dz ) + 1
     jrcv = NINT(xrcv / dx ) + 1
 
-    !###############################################
 
+    !###############################################
 
     B = 1 / rho2D
     M = rho2D * vs2D**2
     L = rho2D * (vp2D**2 - 2*vs2D**2)
-
 
     write(*,*)"##########################################"
     write(*,*)"############### CFL Check ################"
@@ -148,30 +147,16 @@ program FD2D_ELASTIC
     lambdamin = MINVAL(vs2D)/(f0*2.5)
     d         = (/dz,dx/)
     gppw     = lambdamin / maxval(d)
-    tol      = 15;
+    tol      = 13.9
 
     print"(a32,f6.1)", " Grid points per minimum wavelength ->", gppw
 
     if ((gppw)<tol) then
         print*,"Grid spacing size is too large"
         print*,"Numerical dispersion might be present"
-        print*,"Do you wish to continue anyways? Yes/no"
-        read*, filecheck
-
-        if (filecheck=="Yes" .or. filecheck=="yes" .or. filecheck=="y" .or. &
-                filecheck=="Y") then
-            print*,"Proceeding..."
-
-        elseif  (filecheck=="No" .or. filecheck=="no" .or. filecheck=="n" .or. &
-                filecheck=="N") then
-            write(*,*) "Reduce spacing (dz or dx, whichever the largest) size or frequency"
-            write(*,*) "The program has been terminated"
-            stop
-        else
-            write(*,*) "Only: Yes/yes/Y/y & No/no/N/n are handled"
-            write(*,*) "The program have been terminated, please star over"
-            stop
-        end if
+        write(*,*) "Reduce spacing (dz or dx, whichever the largest) size or frequency"
+        write(*,*) "The program has been terminated"
+        stop
     else
         print*, "Spatial sampling as OK!"
     end if
@@ -201,11 +186,10 @@ program FD2D_ELASTIC
         end do
     end do
 
-    isrc = isrc + 1
     write(*,*)"##########################################"
     write(*,*)"########## Begin shot loop      ##########"
     write(*,*)"##########################################"
-
+    print*,nshot
     do is=1,nshot
 
         write(*,*)"##########################################"
@@ -299,12 +283,11 @@ program FD2D_ELASTIC
         open(5,file=outname_u,access="direct",recl=reclsnaps)
         write(5,rec=1) SGX
         close(5)
-
         open(6,file=outname_v,access="direct",recl=reclsnaps)
         write(6,rec=1) SGZ
         close(6)
-    end do
 
+    end do
     call system_clock(count=t1, count_rate=ir)
     time = real(t1 - t0,kind=8) / real(ir,kind=8)
 
@@ -329,3 +312,4 @@ program FD2D_ELASTIC
     deallocate(xrcv,zrcv,xsrc,zsrc)
     deallocate(SGZ,SGX)
 end program
+
