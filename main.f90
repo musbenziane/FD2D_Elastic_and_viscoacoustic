@@ -1,4 +1,58 @@
 program FD2D_ELASTIC
+    !####################################################################################################################
+    ! FD2D: Finite difference solver for the elastic wave equation in cartesian coordinates with flat free surface.
+    ! NOTE: This program has not been validated.
+    ! 
+    ! Language: Fortran 90, with parralel impelementation using OpenMP API
+    ! 
+    ! Author: Mus Benziane
+    ! Source: Virieux 1986
+    !         other sources [2] are mentioned as comments.
+    !
+    ! Input file: [Example]
+    ! testing              ! prefix of model file names, suffixes: _vp _vs _rho
+    ! acqui_src            ! sources positions ascii file name
+    ! acqui_rcv            ! receiver positions ascii file name
+    ! 1996                 ! zmax
+    ! 3196                 ! xmax
+    ! 500                  ! nz
+    ! 800                  ! nx
+    ! 4                    ! dz
+    ! 4                    ! dx
+    ! 0.0004               ! dt
+    ! 4000                 ! nt
+    ! 6.                   ! Wavelet's peak frequency
+    ! 50                   ! Snapshot interval
+    ! 1                    ! [0/1] explosive, otherwise vertical
+    ! 1                    ! [0/1] Free Surface - if set to 0, rigid BC are used, i.e no displacement at boundary
+    ! 1                    ! [0/1] Absorbing
+    ! .65                  ! Att constant for sponge layer
+    ! 70                   ! Sponge layer width
+    !
+    ! -> Acquisition file in ASCII Format: 
+    !  1) receivers ASCII file [N: Receivers number]
+    !
+    !  z1 x1
+    !  z2 x2
+    !  .  .
+    !  zN xN
+    !
+    !  2) Shot points ASCII file [M: Shot points number]
+    !
+    !  z1 x1
+    !  z2 x2
+    !  .  .
+    !  zM xM
+    ! 
+    ! -> Model files in C-Style binary floats [doubles]: Vp, Vs, Rho files are needed.
+    !                                                  : For simple models, use create2Dmodel_files.f90
+    ! 
+    ! -> Outputs are created in OUTPUT/ if OUTPUT/ is not created by the user, the program will not handle it.
+    ! Output files in OUTPUT directory:
+    !
+    !####################################################################################################################
+
+
     !$ USE OMP_LIB
     use read_acqui
 
@@ -72,8 +126,8 @@ program FD2D_ELASTIC
     read(2,*) gWidth
     close(2)
 
-    call countpoints(acqui_rcv,nrcv)
-    call countpoints(acqui_src,nshot)
+    call countpoints(acqui_rcv,nrcv)                    ! Count number of receivers
+    call countpoints(acqui_src,nshot)                   ! Count number of shot points
 
     100 format (A,F6.1,X,F6.1)
     120 format (A,F6.1)
@@ -87,26 +141,32 @@ program FD2D_ELASTIC
     write(*,160)  "Number of time steps           -> ",nt
     write(*,120)  "Ricker's peak frequency        -> ",f0
     write(*,160)  "Snapshot interval              -> ",isnap
+    write(*,160)  "Number Shot points             -> ",nshot
+    write(*,160)  "Number of receivers            -> ",nrcv
+    write(*,160)  "Free Surface BC [1/0]          -> ",FS
+    write(*,160)  "Absorbing BC [1/0]             -> ",ABS
+
 
     modname_vp  = TRIM(modnameprefix)//'_vp'
     modname_vs  = TRIM(modnameprefix)//'_vs'
     modname_rho = TRIM(modnameprefix)//'_rho'
 
-    allocate(vp2D(nz,nx),vs2D(nz,nx),rho2D(nz,nx))
-    allocate(B(nz,nx),M(nz,nx),L(nz,nx))
-    allocate(sigma(nz,nx),tau(nz,nx),xi(nz,nx))
-    allocate(u(nz,nx),v(nz,nx))
-    allocate(src(nt))
-    allocate(gz(nz),gx(nx))
-    allocate(gzx(nz,nx))
-    allocate(Usnap(NINT(REAL(nt/isnap)),nz,nx),Vsnap(NINT(REAL(nt/isnap)),nz,nx))
+    allocate(vp2D(nz,nx),vs2D(nz,nx),rho2D(nz,nx))     ! Model parameters matrices
+    allocate(B(nz,nx),M(nz,nx),L(nz,nx))               ! Model parameters matrices
+    allocate(sigma(nz,nx),tau(nz,nx),xi(nz,nx))        ! Stress tensor parameters matrices
+    allocate(u(nz,nx),v(nz,nx))                        ! Solution parameters matrices
+    allocate(src(nt))                                  ! Source time function
+    allocate(gz(nz),gx(nx))                            ! Abosrbing boundary condition: tmp matrices
+    allocate(gzx(nz,nx))                               ! Abosrbing boundary condition: Grid
+    allocate(Usnap(NINT(REAL(nt/isnap)),nz,nx), &      ! Wavefield snapshot matrice for binary output ...
+             Vsnap(NINT(REAL(nt/isnap)),nz,nx))        ! Fastest dimension: time steps, then nz, lastly, nx
     allocate(xrcv(nrcv),zrcv(nrcv),xsrc(nshot),zsrc(nshot))
-    allocate(SGZ(nt,nrcv),SGX(nt,nrcv))
+    allocate(SGZ(nt,nrcv),SGX(nt,nrcv))                ! Seismograms <<Shot Gathers>> matrices for binary output
 
-    call readmodelfiles(nz,nx,modnameprefix,vp2D,vs2D,rho2D)
+    call readmodelfiles(nz,nx,modnameprefix,vp2D,vs2D,rho2D)       ! Subroutine to read model binaries
     call ricker(nt,f0,dt,src)                                      ! Source time function
-    call read_acqui_geo(acqui_rcv,nrcv,zrcv,xrcv)
-    call read_acqui_geo(acqui_src,nshot,zsrc,xsrc)
+    call read_acqui_geo(acqui_rcv,nrcv,zrcv,xrcv)                  ! Read acquisition geometry from ASCII File: receivers
+    call read_acqui_geo(acqui_src,nshot,zsrc,xsrc)                 ! Same                                     : Shot points
 
     !###############################################
     !### Acquisition geometry and indices stuff ####
@@ -116,19 +176,22 @@ program FD2D_ELASTIC
     !### receiver indices
     ircv = NINT(zrcv / dz ) + 1
     jrcv = NINT(xrcv / dx ) + 1
-
-
     !###############################################
 
-    B = 1 / rho2D
+    
+    !###############################################
+    !### Elastic parameters                     ####
+    B = 1 / rho2D                       
     M = rho2D * vs2D**2
     L = rho2D * (vp2D**2 - 2*vs2D**2)
+    !###############################################
+
 
     write(*,*)"##########################################"
     write(*,*)"############### CFL Check ################"
 
      CFL = dt  * maxval(vp2D(:,:)) * SQRT(1/(dx**2) + 1/(dz**2))
-    if (CFL > .9) then
+    if (CFL > .6) then
         print"( a14,f6.3)"," Courant number is ",CFL
         print*,"Decrease time step, the program has been terminated"
         stop
@@ -143,11 +206,10 @@ program FD2D_ELASTIC
     write(*,*)"########## Space Sampling check ##########"
     write(*,*)"##########################################"
 
-
-    lambdamin = MINVAL(vs2D)/(f0*2.5)
+    lambdamin = MINVAL(vs2D)/(f0*2.5)    ! Shortest wavelength
     d         = (/dz,dx/)
-    gppw     = lambdamin / maxval(d)
-    tol      = 13.9
+    gppw     = lambdamin / maxval(d)     ! Grid points per wavelength
+    tol      = 25                        ! Tolerance set to 25 Grid points / Wavelength
 
     print"(a32,f6.1)", " Grid points per minimum wavelength ->", gppw
 
@@ -161,6 +223,10 @@ program FD2D_ELASTIC
         print*, "Spatial sampling as OK!"
     end if
 
+
+    !###############################################
+    !### Absorbing boundary condition grid prep ####
+    !### See Cerjan 1985
     gz(:)    = 1
     gx(:)    = 1
     gzx(:,:) = 1
@@ -172,8 +238,7 @@ program FD2D_ELASTIC
         gx(nx-k+1)  = taper
     end do
 
-
-    if (FS == 0) then
+    if (FS == 0) then ! If free surface boundary condtions, sponge layers won't be used below the surface
         do k=1,gWidth
             taper       = exp(-(attConst*(gWidth-k)/20)**2)
             gz(k)       = taper
@@ -185,11 +250,16 @@ program FD2D_ELASTIC
             gzx(iz,ix) = gz(iz) * gx(ix)
         end do
     end do
+    !###############################################
+
+    if (FS==1) then  ! If free surface boundary conditions, source is moved to free surface
+        isrc(:) = 2
+    end if
+
 
     write(*,*)"##########################################"
     write(*,*)"########## Begin shot loop      ##########"
     write(*,*)"##########################################"
-    print*,nshot
     do is=1,nshot
 
         write(*,*)"##########################################"
@@ -197,17 +267,21 @@ program FD2D_ELASTIC
         write(*,*)"##########################################"
         k = 0
         do it=1,nt
-            if (srctype==1) then
+            !###############################################
+            !### Begin time loop                       #####
+            !###############################################
+
+            if (srctype==1) then    ! Explosive source
                 u(isrc(is),jsrc(is)) = u(isrc(is),jsrc(is)) + dt * src(it)
                 v(isrc(is),jsrc(is)) = v(isrc(is),jsrc(is)) + dt * src(it)
-            else
+            else                    ! Vertical source
                 v(isrc(is),jsrc(is)) = v(isrc(is),jsrc(is)) + dt * src(it)
             end if
 
             !$OMP PARALLEL DO PRIVATE(iz,ix) SHARED(u,v,sigma,xi,tau) SCHEDULE(static)
             do iz=2,nz-1
                 do ix=2,nx-1
-
+                    ! Staggered grids finite difference scheme << Velocity-Stress formulation >>
                     u(iz,ix)     = u(iz,ix) +      B(iz,ix) * (dt/dx) * (sigma(iz, ix) - sigma(iz,ix-1)) + &
                                                    B(iz,ix) * (dt/dz) * (xi(iz, ix) - xi(iz-1,ix))
 
@@ -225,14 +299,27 @@ program FD2D_ELASTIC
                 end do
             end do
             !$OMP END PARALLEL DO
-
+            
+            !##################################################
+            !### Free Surface Boundary conditions      ########
+            !### See: Moczo, P., Kristek, J., & Gális, M. 
+            ! (2014). The Finite-Difference Modelling of 
+            ! Earthquake Motions: Waves and Ruptures. Cambridge: 
+            ! Cambridge University Press. 
+            ! doi:10.1017/CBO9781139236911     
+            ! Chapter 7.5.1: << Stress Imaging >> 
+            ! This is a trial for planar FS boundary conditions
             if (FS==1) then
                 tau(1,:) = -tau(3,:);
                 xi(1,:)  = -xi(3,:);
                 u(1,:)   = u(3,:);
                 v(1,:)   = v(3,:);
             end if
+            !##################################################
 
+
+            !##################################################
+            !### Abosrbing Boundary conditions         ########
             if (ABS==1) then
                 tau   = tau   * gzx
                 sigma = sigma * gzx
@@ -240,32 +327,34 @@ program FD2D_ELASTIC
                 u     = u     * gzx
                 v     = v     * gzx
             end if
+            !##################################################
 
-
+            ! Get wavefield snapshot
             if (mod(it,isnap) == 0) then
                 k = k + 1
                 Usnap(k,:,:) = u
                 Vsnap(k,:,:) = v
             end if
-            if (mod(it,NINT(nt/20.)) == 0) then
+            
+            ! Display progress
+            if (mod(it,NINT(nt/10.)) == 0) then
                 print*, "########### At time sample ->",it, "/",nt
             end if
 
             !##### Extract displacement at receiver point
-
             do i=1,nrcv
                 SGZ(it,i) = v(ircv(i),jrcv(i))
                 SGX(it,i) = u(ircv(i),jrcv(i))
             end do
-
-        end do
-
+        end do ! time loop ends here
+                
         write(isstr,"(I5.5)") is
         outname_u      = "OUTPUT/SnapX_"//TRIM(isstr)
         outname_v      = "OUTPUT/SnapZ_"//TRIM(isstr)
 
         inquire(iolength=reclsnaps) Vsnap
-
+        
+        ! ### Write solution binary: Snapshot
         open(3,file=outname_u,access="direct",recl=reclsnaps)
         write(3,rec=1) Usnap
         close(3)
@@ -280,14 +369,17 @@ program FD2D_ELASTIC
 
         inquire(iolength=reclsnaps) SGZ
 
+        ! ### Write solution binary: Seismograms
         open(5,file=outname_u,access="direct",recl=reclsnaps)
         write(5,rec=1) SGX
         close(5)
-        open(6,file=outname_v,access="direct",recl=reclsnaps)
-        write(6,rec=1) SGZ
-        close(6)
 
-    end do
+        open(7,file=outname_v,access="direct",recl=reclsnaps)
+        write(7,rec=1) SGZ
+        close(7)
+
+    end do  ! shot loop ends here
+
     call system_clock(count=t1, count_rate=ir)
     time = real(t1 - t0,kind=8) / real(ir,kind=8)
 
@@ -312,4 +404,3 @@ program FD2D_ELASTIC
     deallocate(xrcv,zrcv,xsrc,zsrc)
     deallocate(SGZ,SGX)
 end program
-
