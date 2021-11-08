@@ -171,11 +171,11 @@ program FD2D_ELASTIC
     !###############################################
     !### Acquisition geometry and indices stuff ####
     !### Source indices
-    isrc = NINT(zsrc / dz )+1
-    jsrc = NINT(xsrc / dx )+1
+    isrc = NINT(zsrc / dz) + 1
+    jsrc = NINT(xsrc / dx) + 1
     !### receiver indices
-    ircv = NINT(zrcv / dz ) + 1
-    jrcv = NINT(xrcv / dx ) + 1
+    ircv = NINT(zrcv / dz) + 1
+    jrcv = NINT(xrcv / dx) + 1
     !###############################################
 
     
@@ -192,7 +192,7 @@ program FD2D_ELASTIC
 
      CFL = dt  * maxval(vp2D(:,:)) * SQRT(1/(dx**2) + 1/(dz**2))
     if (CFL > .6) then
-        print"( a14,f6.3)"," Courant number is ",CFL
+        print"(a14,f6.3)"," Courant number is ",CFL
         print*,"Decrease time step, the program has been terminated"
         stop
     else
@@ -282,20 +282,20 @@ program FD2D_ELASTIC
             do iz=2,nz-1
                 do ix=2,nx-1
                     ! Staggered grids finite difference scheme << Velocity-Stress formulation >>
-                    u(iz,ix)     = u(iz,ix) +      B(iz,ix) * (dt/dx) * (sigma(iz, ix) - sigma(iz,ix-1)) + &
-                                                   B(iz,ix) * (dt/dz) * (xi(iz, ix) - xi(iz-1,ix))
+                    u(iz,ix)     = u(iz,ix) +      B(iz,ix) * (dt/dx) * (sigma(iz, ix+1) - sigma(iz,ix)) + &
+                                                   B(iz,ix) * (dt/dz) * (xi(iz+1, ix) - xi(iz,ix))
 
-                    v(iz,ix)     = v(iz,ix) +      B(iz,ix) * (dt/dx) * (xi(iz, ix) - xi(iz,ix-1)) +  &
-                                                   B(iz,ix) * (dt/dz) * (tau(iz, ix) - tau(iz-1,ix))
+                    v(iz,ix)     = v(iz,ix) +      B(iz,ix) * (dt/dx) * (xi(iz, ix+1) - xi(iz,ix)) +  &
+                                                   B(iz,ix) * (dt/dz) * (tau(iz+1, ix) - tau(iz,ix))
 
-                    sigma(iz,ix) = sigma(iz,ix) + (L(iz,ix) + 2*M(iz,ix)) * (dt/dx) * (u(iz,ix+1) - u(iz,ix)) + &
-                                                   L(iz,ix) * (dt/dz) * (v(iz+1,ix) - v(iz,ix))
+                    sigma(iz,ix) = sigma(iz,ix) + (L(iz,ix) + 2*M(iz,ix)) * (dt/dx) * (u(iz,ix) - u(iz,ix-1)) + &
+                                                   L(iz,ix) * (dt/dz) * (v(iz,ix) - v(iz-1,ix))
 
-                    tau(iz,ix)   = tau(iz,ix)   + (L(iz,ix) + 2*M(iz,ix)) * (dt/dz) * (v(iz+1,ix) - v(iz,ix)) + &
-                                                   L(iz,ix) * (dt/dx) * (u(iz,ix+1) - u(iz,ix))
+                    tau(iz,ix)   = tau(iz,ix)   + (L(iz,ix) + 2*M(iz,ix)) * (dt/dz) * (v(iz,ix) - v(iz-1,ix)) + &
+                                                   L(iz,ix) * (dt/dx) * (u(iz,ix) - u(iz,ix-1))
 
-                    xi(iz,ix)    = xi(iz,ix)    +  M(iz,ix) * (dt/dz) * (u(iz+1,ix) - u(iz,ix))  + &
-                                                   M(iz,ix) * (dt/dx) * (v(iz,ix+1) - v(iz,ix))
+                    xi(iz,ix)    = xi(iz,ix)    +  M(iz,ix) * (dt/dz) * (u(iz,ix) - u(iz-1,ix))  + &
+                                                   M(iz,ix) * (dt/dx) * (v(iz,ix) - v(iz,ix-1))
                 end do
             end do
             !$OMP END PARALLEL DO
@@ -310,10 +310,10 @@ program FD2D_ELASTIC
             ! Chapter 7.5.1: << Stress Imaging >> 
             ! This is a trial for planar FS boundary conditions
             if (FS==1) then
-                tau(1,:) = -tau(3,:);
-                xi(1,:)  = -xi(3,:);
-                u(1,:)   = u(3,:);
-                v(1,:)   = v(3,:);
+                tau(1,:) = -tau(3,:)
+                xi(1,:)  = -xi(3,:)
+                u(1,:)   = u(3,:)
+                v(1,:)   = v(3,:)
             end if
             !##################################################
 
