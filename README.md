@@ -1,5 +1,5 @@
 <h2>FD Solver for the Elastic Wave Equation in 2D using Staggered Grids Scheme, as per Virieux 1986</h2>
-<br>
+<br> Changes are still being made ...<br>
 Fot input, "parameters.in" in build/. The matlab script generates the receivers positions ASCII file.
 <br> Same matlab script can be used to generate shot positions.
 <br> OpenMP flag needs to be used during compliation. Otherwise the program will run in serial.
