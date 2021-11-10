@@ -178,6 +178,7 @@ program FD2D_ELASTIC
     jrcv = NINT(xrcv / dx) + 1
     !###############################################
 
+
     
     !###############################################
     !### Elastic parameters                     ####
@@ -320,11 +321,15 @@ program FD2D_ELASTIC
             ! doi:10.1017/CBO9781139236911     
             ! Chapter 7.5.1: << Stress Imaging >> 
             ! This is a trial for planar FS boundary conditions
+            ! 
+            ! Note: This should not work, the starting point was from stress imaging in 1D, the formulation of which...
+            ! is not suitable for higher dimensions. Working on it ...
             if (FS==1) then
-                tau(1,:) = -tau(5,:)
-                xi(1,:)  = -xi(5,:)
-                u(1,:)   =  u(5,:)
-                v(1,:)   =  v(5,:)
+                sigma(3,:)=  0
+                tau(1,:)  = -tau(5,:)
+                xi(1,:)   = -xi(5,:)
+                u(1,:)    =  u(5,:)
+                v(1,:)    =  v(5,:)
 
                 tau(2,:) = -tau(4,:)
                 xi(2,:)  = -xi(4,:)
