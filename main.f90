@@ -209,7 +209,7 @@ program FD2D_ELASTIC
     lambdamin = MINVAL(vs2D)/(f0*2.5)    ! Shortest wavelength
     d         = (/dz,dx/)
     gppw     = lambdamin / maxval(d)     ! Grid points per wavelength
-    tol      = 25                        ! Tolerance set to 25 Grid points / Wavelength
+    tol      = 18                        ! Tolerance set to 25 Grid points / Wavelength
 
     print"(a32,f6.1)", " Grid points per minimum wavelength ->", gppw
 
@@ -253,7 +253,8 @@ program FD2D_ELASTIC
     !###############################################
 
     if (FS==1) then  ! If free surface boundary conditions, source is moved to free surface
-        isrc(:) = 2
+        isrc(:) = 3
+        ircv(:) = 3
     end if
 
 
@@ -279,23 +280,33 @@ program FD2D_ELASTIC
             end if
 
             !$OMP PARALLEL DO PRIVATE(iz,ix) SHARED(u,v,sigma,xi,tau) SCHEDULE(static)
-            do iz=2,nz-1
-                do ix=2,nx-1
+            do iz=3,nz-2
+                do ix=3,nx-2
                     ! Staggered grids finite difference scheme << Velocity-Stress formulation >>
-                    u(iz,ix)     = u(iz,ix) +      B(iz,ix) * (dt/dx) * (sigma(iz, ix+1) - sigma(iz,ix)) + &
-                                                   B(iz,ix) * (dt/dz) * (xi(iz+1, ix) - xi(iz,ix))
+                    u(iz,ix)     = u(iz,ix)     +  B(iz,ix) * (dt/dx) * (9./8. * (sigma(iz, ix+1) - sigma(iz,ix))    & 
+                                                                       -1./24. * (sigma(iz, ix+2) - sigma(iz,ix-1))) &  
+                                                +  B(iz,ix) * (dt/dz) * (9./8. * (xi(iz+1, ix)    - xi(iz,ix))       & 
+                                                                       -1./24. * (xi(iz+2, ix)    - xi(iz-1,ix)))
 
-                    v(iz,ix)     = v(iz,ix) +      B(iz,ix) * (dt/dx) * (xi(iz, ix+1) - xi(iz,ix)) +  &
-                                                   B(iz,ix) * (dt/dz) * (tau(iz+1, ix) - tau(iz,ix))
+                    v(iz,ix)     = v(iz,ix)     +  B(iz,ix) * (dt/dx) * (9./8. * (xi(iz, ix+1)    - xi(iz,ix))       &
+                                                                       -1./24. * (xi(iz, ix+2)    - xi(iz,ix-1)))    &
+                                                +  B(iz,ix) * (dt/dz) * (9./8. * (tau(iz+1, ix)   - tau(iz,ix))      &
+                                                                       -1./24. * (tau(iz+2, ix)   - tau(iz-1,ix)))                                              
 
-                    sigma(iz,ix) = sigma(iz,ix) + (L(iz,ix) + 2*M(iz,ix)) * (dt/dx) * (u(iz,ix) - u(iz,ix-1)) + &
-                                                   L(iz,ix) * (dt/dz) * (v(iz,ix) - v(iz-1,ix))
+                    sigma(iz,ix) = sigma(iz,ix) + (L(iz,ix) + 2*M(iz,ix)) * (dt/dx) * (9./8. * (u(iz,ix)   - u(iz,ix-1))  &
+                                                                                     -1./24. * (u(iz,ix+1) - u(iz,ix-2))) &
+                                                +  L(iz,ix)               * (dt/dz) * (9./8. * (v(iz,ix)   - v(iz-1,ix))  &
+                                                                                     -1./24. * (v(iz+1,ix) - v(iz-2,ix)))
 
-                    tau(iz,ix)   = tau(iz,ix)   + (L(iz,ix) + 2*M(iz,ix)) * (dt/dz) * (v(iz,ix) - v(iz-1,ix)) + &
-                                                   L(iz,ix) * (dt/dx) * (u(iz,ix) - u(iz,ix-1))
+                    tau(iz,ix)   = tau(iz,ix)   + (L(iz,ix) + 2*M(iz,ix)) * (dt/dz) * (9./8. * (v(iz,ix)   - v(iz-1,ix))  &
+                                                                                     -1./24. * (v(iz+1,ix) - v(iz-2,ix))) &
+                                                +                L(iz,ix) * (dt/dx) * (9./8. * (u(iz,ix)   - u(iz,ix-1))  &
+                                                                                     -1./24. * (u(iz,ix+1) - u(iz,ix-2)))
 
-                    xi(iz,ix)    = xi(iz,ix)    +  M(iz,ix) * (dt/dz) * (u(iz,ix) - u(iz-1,ix))  + &
-                                                   M(iz,ix) * (dt/dx) * (v(iz,ix) - v(iz,ix-1))
+                    xi(iz,ix)    = xi(iz,ix)    +  M(iz,ix)               * (dt/dz) * (9./8. * (u(iz,ix)   - u(iz-1,ix))  &
+                                                                                     -1./24. * (u(iz+1,ix) - u(iz-2,ix))) &        
+                                                +                M(iz,ix) * (dt/dx) * (9./8. * (v(iz,ix)   - v(iz,ix-1))  &
+                                                                                     -1./24. * (v(iz,ix+1) - v(iz,ix-2)))
                 end do
             end do
             !$OMP END PARALLEL DO
@@ -310,10 +321,15 @@ program FD2D_ELASTIC
             ! Chapter 7.5.1: << Stress Imaging >> 
             ! This is a trial for planar FS boundary conditions
             if (FS==1) then
-                tau(1,:) = -tau(3,:)
-                xi(1,:)  = -xi(3,:)
-                u(1,:)   = u(3,:)
-                v(1,:)   = v(3,:)
+                tau(1,:) = -tau(5,:)
+                xi(1,:)  = -xi(5,:)
+                u(1,:)   =  u(5,:)
+                v(1,:)   =  v(5,:)
+
+                tau(2,:) = -tau(4,:)
+                xi(2,:)  = -xi(4,:)
+                u(2,:)   =  u(4,:)
+                v(2,:)   =  v(4,:)
             end if
             !##################################################
 
