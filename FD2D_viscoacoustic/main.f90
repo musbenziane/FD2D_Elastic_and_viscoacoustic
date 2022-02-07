@@ -1,33 +1,26 @@
 program FD2D_VISCOACOUSTIC
     !####################################################################################################################
-    ! FD2D: Finite difference solver for the elastic wave equation in cartesian coordinates with flat free surface.
-    ! NOTE: This program has not been validated.
-    ! 
-    ! Language: Fortran 90, with parralel impelementation using OpenMP API
+    ! FD2D: Finite difference solver for the visco(acoustic) wave equation in cartesian coordinates with flat free surface.
+    !  
+    ! Language: Fortran 90, with parralel impelementation using OpenMP API (by 08/02)
     ! 
     ! Author: Mus Benziane
-    ! Source: Virieux 1986
-    !         other sources [2] are mentioned as comments.
-    ! 
+    ! Source: ... 
+    !         
     ! Input file: [Example]
-    ! testing              ! prefix of model file names, suffixes: _vp _vs _rho
-    ! acqui_src            ! sources positions ascii file name
+    ! Marmousi             ! prefix of model file names, suffixes: _vp _vs _rho
+    !acqui_src            ! sources positions ascii file name
     ! acqui_rcv            ! receiver positions ascii file name
-    ! 1996                 ! zmax
-    ! 3196                 ! xmax
-    ! 500                  ! nz
-    ! 800                  ! nx
-    ! 4                    ! dz
-    ! 4                    ! dx
-    ! 0.0004               ! dt
-    ! 4000                 ! nt
-    ! 6.                   ! Wavelet's peak frequency
-    ! 50                   ! Snapshot interval
-    ! 1                    ! [0/1] explosive, otherwise vertical
-    ! 1                    ! [0/1] Free Surface - if set to 0, rigid BC are used, i.e no displacement at boundary
-    ! 1                    ! [0/1] Absorbing
-    ! .65                  ! Att constant for sponge layer
-    ! 70                   ! Sponge layer width
+    ! 52                   ! nz
+    ! 232                  ! nx
+    ! 2.5                  ! dz, dx
+    ! 0.00012              ! dt
+    ! 12000                ! nt
+    ! 15.                  ! Wavelet's peak frequency
+    ! 20                   ! Snapshot interval
+    ! 1                    ! is_FS
+    ! 1                    ! is_PML
+    ! 60                   ! nPML
     !
     ! -> Acquisition file in ASCII Format: 
     !  1) receivers ASCII file [N: Receivers number]
@@ -44,7 +37,7 @@ program FD2D_VISCOACOUSTIC
     !  .  .
     !  zM xM
     ! 
-    ! -> Model files in C-Style binary floats [doubles]: Vp, Vs, Rho files are needed.
+    ! -> Model files in C-Style binary floats [doubles]: C, QF, Rho files are needed.
     !                                                  : For simple models, use create2Dmodel_files.f90
     ! 
     ! -> Outputs are created in OUTPUT/ if OUTPUT/ is not created by the user, the program will not handle it.
@@ -308,7 +301,7 @@ program FD2D_VISCOACOUSTIC
         !###############################################
         !### Begin time loop                       #####
         !###############################################
-        
+
         do it=1,nt
             do iz=5,nz-4
                 do ix=5,nx-4
@@ -418,12 +411,11 @@ program FD2D_VISCOACOUSTIC
         write(7,rec=1) seis_w
         close(7)
 
-        open(8,file=outname_w,access="direct",recl=reclsnaps)
-        write(8,rec=1) seis_w
+        open(8,file=outname_u,access="direct",recl=reclsnaps)
+        write(8,rec=1) seis_u
         close(8)
 
     end do
-
 
 
     call system_clock(count=t1, count_rate=ir)
@@ -438,5 +430,13 @@ program FD2D_VISCOACOUSTIC
         &,3X,"CPU Time            : ",1PE10.3," [s]",//)', &
         & time,t_cpu
     write(*,*) "##########################################"
+
+
+
+
+
+
+
+
 
 end program
